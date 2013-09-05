@@ -98,7 +98,7 @@ class Migration {
 
 		$sql .= ')';
 		
-		// indices
+		// TODO: Indices
 
 		if (! DB::execute ($sql)) {
 			$this->error = DB::error ();
@@ -126,9 +126,9 @@ class Migration {
 	public function alter () {
 		$sql = 'alter table ' . Model::backticks ($this->table);
 
-		// columns
+		// TODO: Columns
 		
-		// indices
+		// TODO: Indices
 
 		if (! DB::execute ($sql)) {
 			$this->error = DB::error ();
@@ -179,6 +179,7 @@ class Migration {
 	 * Create the SQL declaration for a single column.
 	 */
 	public function define_column ($name, $type, $options) {
+		// TODO: Finish definitions (type mapping, options)
 		return Model::backticks ($name) . ' ' . $this->_types[$type];
 	}
 
@@ -197,6 +198,7 @@ class Migration {
 	 * Drop a column.
 	 */
 	public function drop_column ($name) {
+		// TODO: Fix drop column
 		return $this->run (sprintf (
 			'alter table %s drop column %s',
 			Model::backticks ($this->table),
