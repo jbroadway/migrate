@@ -26,6 +26,18 @@ class Migrator {
 	public function __construct ($name) {
 		$this->name = $name;
 	}
+	
+	/**
+	 * Find the app name for a migration.
+	 */
+	public function filename ($name, $revision) {
+		if (strpos ($name, '\\') === false) {
+			return false;
+		}
+
+		list ($app, $class) = explode ('\\', $name, 2);
+		return 'apps/' . $app . '/migrations/' . $class . '_' . $revision . '.php';
+	}
 
 	/**
 	 * Returns the currently applied revision.
@@ -113,6 +125,16 @@ class Migrator {
 				break;
 			}
 			
+			$filename = $this->filename ($this->name, $version);
+			if (! $filename) {
+				$this->error = 'No app name specified.';
+				return false;
+			} elseif (! file_exists ($filename)) {
+				$this->error = 'File not found: ' . $filename;
+				return false;
+			}
+
+			require_once ($filename);
 			$class = $this->name . '_' . $version;
 			$m = new $class;
 			if (! $m->up ()) {
@@ -156,12 +178,23 @@ class Migrator {
 				break;
 			}
 			
+			$filename = $this->filename ($this->name, $version);
+			if (! $filename) {
+				$this->error = 'No app name specified.';
+				return false;
+			} elseif (! file_exists ($filename)) {
+				$this->error = 'File not found: ' . $filename;
+				return false;
+			}
+
+			require_once ($filename);
 			$class = $this->name . '_' . $version;
 			$m = new $class;
-			if (! $m->up ()) {
+			if (! $m->down ()) {
 				$this->error = $version . ': ' . $m->error;
 				return false;
 			} else {
+				// TODO: Revision should be previous or no entry, not last reverted
 				if ($current === false) {
 					DB::execute (
 						'insert into `#prefix#migrations` values (?, ?, ?)',
