@@ -83,21 +83,47 @@ class Migration {
 	public function create () {
 		$sql = 'create table ' . Model::backticks ($this->table) . ' (';
 		$sep = '';
+		$sequences = array ();
 
-		// columns
+		// Build the column list
 		foreach ($this->_columns as $col) {
 			$sql .= $sep . $this->define_column ($col['name'], $col['type'], $col['options']);
 			$sep = ",\n";
+
+			// Check for sequences in PostgreSQL
+			if ($this->_driver === 'pgsql' && isset ($col['options']['auto-increment'])) {
+				$sequences[] = 'create sequence ' . Model::backticks ($this->table . '_' . $col['name'] . '_seq');
+			}
 		}
 
 		$sql .= ')';
-		
-		// TODO: Indices and auto-incrementing fields
 
+		// Create sequences for PostgreSQL auto-incrementing columns		
+		foreach ($sequences as $sequence) {
+			if (! DB::execute ($sequence)) {
+				$this->error = DB::error ();
+				return false;
+			}
+		}
+
+		// Create the table
 		if (! DB::execute ($sql)) {
 			$this->error = DB::error ();
 			return false;
 		}
+
+		// Build indices
+		foreach ($this->_indices as $name => $index) {
+			$create = 'create index ' . Model::backticks ($name)
+				. ' on ' . Model::backticks ($this->table) . ' ('
+				. join (', ', array_map ('Model::backticks', $index['fields'])) . ')';
+
+			if (! DB::execute ($create)) {
+				$this->error = DB::error ();
+				return false;
+			}
+		}
+
 		return true;
 	}
 
@@ -132,7 +158,7 @@ class Migration {
 	 */
 	public function index ($fields) {
 		$fields = is_array ($fields) ? $fields : array ($fields);
-		$name = $this->table . '_' . join ('_', $fields);
+		$name = $this->table . '_' . join ('_', $fields) . '_idx';
 		$this->_indices[$name] = array (
 			'name' => $name,
 			'fields' => $fields
@@ -156,7 +182,6 @@ class Migration {
 	 */
 	public function define_column ($name, $type = 'char', $options = array ()) {
 		$opts = '';
-		$sep = ' ';
 
 		foreach ($options as $opt => $val) {
 			switch ($opt) {
@@ -185,6 +210,19 @@ class Migration {
 				case 'comment':
 					$opts .= " comment '" . str_replace ("'", "''", $val) . "'";
 					break;
+				case 'auto-increment':
+					if ($this->_driver === 'sqlite') {
+						$type = 'integer';
+						if (! isset ($options['primary'])) {
+							$opts .= ' primary key';
+						}
+					} elseif ($this->_driver === 'pgsql') {
+						// Assume for now we will create the sequence later
+						$opts .= " nextval('" . $this->table . '_' . $name . "_seq')";
+					} elseif ($this->_driver === 'mysql') {
+						$opts .= ' auto_increment';
+					}
+					break;
 			}
 		}
 
@@ -204,7 +242,7 @@ class Migration {
 	public function add_column ($name, $type = 'char', $options = array ()) {
 		$sql = 'alter table ' . Model::backticks ($this->table) . ' add column ';
 		$sql .= $this->define_column ($name, $type, $options);
-		if ($this->driver () !== 'sqlite') {
+		if ($this->_driver !== 'sqlite') {
 			$sql .= isset ($options['after']) ? ' after ' . Model::backticks ($options['after']) : '';
 		}
 		
@@ -215,7 +253,7 @@ class Migration {
 	 * Drop a column. Note: Not supported in SQLite.
 	 */
 	public function drop_column ($name) {
-		if ($this->driver () === 'sqlite') {
+		if ($this->_driver === 'sqlite') {
 			$this->error = 'Method not supported in SQLite';
 			return false;
 		}
@@ -231,7 +269,7 @@ class Migration {
 	 * Rename a column. Note: Not supported in SQLite.
 	 */
 	public function rename_column ($old, $new, $type = 'char', $options = array ()) {
-		if ($this->driver () === 'sqlite') {
+		if ($this->_driver === 'sqlite') {
 			$this->error = 'Method not supported in SQLite';
 			return false;
 		}

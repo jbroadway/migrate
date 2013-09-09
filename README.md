@@ -6,11 +6,6 @@ of command line options for viewing and applying/reverting changes.
 
 **Status: Beta**
 
-To do:
-
-* Indices
-* Auto-incrementing fields
-
 ## Installation
 
 Copy the `migrate` app folder into `apps/migrate` and run the following
@@ -74,6 +69,7 @@ class MyModel_20130922012345 extends \Migration {
 			->column ('title', 'string', array ('limit' => 72))
 			->column ('created', 'datetime', array ('null' => false))
 			->column ('body', 'text', array ('null' => false))
+			->index (array ('created'))
 			->create ();
 	}
 	

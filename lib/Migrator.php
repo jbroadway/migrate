@@ -180,7 +180,6 @@ class Migrator {
 
 			// The previous revision
 			$previous = isset ($versions[$vkey + 1]) ? $versions[$vkey + 1] : '';
-			var_dump ($previous);
 			
 			$filename = $this->filename ($this->name, $version);
 			if (! $filename) {

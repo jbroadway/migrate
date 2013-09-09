@@ -17,6 +17,7 @@ class Articles_20130905195757 extends \Migration {
 			->column ('title', 'string', array ('limit' => 72))
 			->column ('created', 'datetime', array ('null' => false))
 			->column ('body', 'text', array ('null' => false))
+			->index (array ('created'))
 			->create ();
 	}
 	
