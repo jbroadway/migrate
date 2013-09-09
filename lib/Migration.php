@@ -47,13 +47,7 @@ class Migration {
 	protected $_indices = array ();
 
 	protected $_types = array (
-		'integer' => 'integer',
 		'string' => 'char',
-		'text' => 'text',
-		'date' => 'date',
-		'time' => 'time',
-		'datetime' => 'datetime',
-		'timestamp' => 'timestamp'
 	);
 
 	/**
@@ -98,7 +92,7 @@ class Migration {
 
 		$sql .= ')';
 		
-		// TODO: Indices
+		// TODO: Indices and auto-incrementing fields
 
 		if (! DB::execute ($sql)) {
 			$this->error = DB::error ();
@@ -120,29 +114,11 @@ class Migration {
 	}
 
 	/**
-	 * Execute an ALTER TABLE statement based on the current
-	 * columns/indices.
-	 */
-	public function alter () {
-		$sql = 'alter table ' . Model::backticks ($this->table);
-
-		// TODO: Columns
-		
-		// TODO: Indices
-
-		if (! DB::execute ($sql)) {
-			$this->error = DB::error ();
-			return false;
-		}
-		return true;
-	}
-
-	/**
 	 * Add a column to the table definition. You can chain a series of
 	 * `column()` calls and add a `->create()` at the end to execute
 	 * the creation of a new database table.
 	 */
-	public function column ($name, $type, $options) {
+	public function column ($name, $type = 'char', $options = array ()) {
 		$this->_columns[$name] = array (
 			'name' => $name,
 			'type' => $type,
@@ -178,27 +154,72 @@ class Migration {
 	/**
 	 * Create the SQL declaration for a single column.
 	 */
-	public function define_column ($name, $type, $options) {
-		// TODO: Finish definitions (type mapping, options)
-		return Model::backticks ($name) . ' ' . $this->_types[$type];
+	public function define_column ($name, $type = 'char', $options = array ()) {
+		$opts = '';
+		$sep = ' ';
+
+		foreach ($options as $opt => $val) {
+			switch ($opt) {
+				case 'default':
+					$opts .= ' default ' . (is_numeric ($val)
+						? $val
+						: "'" . str_replace ("'", "''", $val) . "'");
+					break;
+				case 'limit':
+					if (is_array ($val)) {
+						$opts = '(' . $val[0] . ',' . $val[1] . ')' . $opts;
+					} else {
+						$opts = '(' . $val . ')' . $opts;
+					}
+					break;
+				case 'unsigned':
+				case 'signed':
+					$opts .= ' ' . $opt;
+					break;
+				case 'null':
+					$opts .= ' ' . ($val ? 'null' : 'not null');
+					break;
+				case 'primary':
+					$opts .= ' primary key';
+					break;
+				case 'comment':
+					$opts .= " comment '" . str_replace ("'", "''", $val) . "'";
+					break;
+			}
+		}
+
+		return sprintf (
+			'%s %s%s',
+			Model::backticks ($name),
+			isset ($this->_types[$type]) ? $this->_types[$type] : $type,
+			$opts
+		);
 	}
 
 	/**
-	 * Add a new column.
+	 * Add a new column. Note: SQLite will always add the column
+	 * to the end of the table, even if `'after' => 'colname'` is
+	 * specified.
 	 */
-	public function add_column ($name, $type = 'string', $options = array ()) {
+	public function add_column ($name, $type = 'char', $options = array ()) {
 		$sql = 'alter table ' . Model::backticks ($this->table) . ' add column ';
 		$sql .= $this->define_column ($name, $type, $options);
-		$sql .= isset ($options['after']) ? ' after ' . Model::backticks ($options['after']) : '';
+		if ($this->driver () !== 'sqlite') {
+			$sql .= isset ($options['after']) ? ' after ' . Model::backticks ($options['after']) : '';
+		}
 		
 		return $this->run ($sql);
 	}
 
 	/**
-	 * Drop a column.
+	 * Drop a column. Note: Not supported in SQLite.
 	 */
 	public function drop_column ($name) {
-		// TODO: Fix drop column
+		if ($this->driver () === 'sqlite') {
+			$this->error = 'Method not supported in SQLite';
+			return false;
+		}
+
 		return $this->run (sprintf (
 			'alter table %s drop column %s',
 			Model::backticks ($this->table),
@@ -207,35 +228,20 @@ class Migration {
 	}
 
 	/**
-	 * Rename a column.
+	 * Rename a column. Note: Not supported in SQLite.
 	 */
-	public function rename_column ($old, $new, $type, $options) {
-		DB::beginTransaction ();
-
-		$options['after'] = $old;
-
-		if (! $this->add_column ($new, $type, $options)) {
-			DB::rollback ();
+	public function rename_column ($old, $new, $type = 'char', $options = array ()) {
+		if ($this->driver () === 'sqlite') {
+			$this->error = 'Method not supported in SQLite';
 			return false;
 		}
-		
-		if (! $this->run (sprintf (
-			'update %s set %s = %s',
+
+		return $this->run (sprintf (
+			'alter table %s rename column %s %s' ,
 			Model::backticks ($this->table),
-			Model::backticks ($new),
-			Model::backticks ($old)
-		))) {
-			DB::rollback ();
-			return false;
-		}
-		
-		if (! $this->drop_column ($old)) {
-			DB::rollback ();
-			return false;
-		}
-
-		DB::commit ();
-		return true;
+			Model::backticks ($old),
+			$this->define_column ($new, $type, $options)
+		));
 	}
 }
 

@@ -169,7 +169,7 @@ class Migrator {
 		$current = $this->current ();
 		$versions = array_reverse ($this->versions ());
 
-		foreach ($versions as $version) {
+		foreach ($versions as $vkey => $version) {
 			if ($current !== false && $version > $current) {
 				// Don't apply down() on unapplied newer revisions
 				continue;
@@ -177,6 +177,10 @@ class Migrator {
 				// Don't apply down() on specified revision or earlier
 				break;
 			}
+
+			// The previous revision
+			$previous = isset ($versions[$vkey + 1]) ? $versions[$vkey + 1] : '';
+			var_dump ($previous);
 			
 			$filename = $this->filename ($this->name, $version);
 			if (! $filename) {
@@ -194,22 +198,12 @@ class Migrator {
 				$this->error = $version . ': ' . $m->error;
 				return false;
 			} else {
-				// TODO: Revision should be previous or no entry, not last reverted
-				if ($current === false) {
-					DB::execute (
-						'insert into `#prefix#migrations` values (?, ?, ?)',
-						$this->name,
-						$version,
-						gmdate ('Y-m-d H:i:s')
-					);
-				} else {
-					DB::execute (
-						'update `#prefix#migrations set `revision` = ?, `applied` = ? where `name` = ?', 
-						$version,
-						gmdate ('Y-m-d H:i:s'),
-						$this->name
-					);
-				}
+				DB::execute (
+					'update `#prefix#migrations` set `revision` = ?, `applied` = ? where `name` = ?', 
+					$previous,
+					gmdate ('Y-m-d H:i:s'),
+					$this->name
+				);
 				$current = $version;
 			}
 		}
