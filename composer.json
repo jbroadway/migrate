@@ -1,0 +1,20 @@
+{
+    "name": "elefant/app-migrate",
+    "type": "elefant-app",
+    "description": "Database migrations for the Elefant CMS",
+    "keywords": ["database", "migrations", "elefant", "cms", "app"],
+    "license": "MIT",
+	"authors": [
+		{
+			"name": "Johnny Broadway",
+			"email": "johnny@johnnybroadway.com",
+			"homepage": "http://www.johnnybroadway.com/"
+		}
+	],
+    "repositories": [
+        {"type": "git", "url": "http://github.com/jbroadway/elefant_installer"}
+    ],
+    "require": {
+        "elefant/app-installer": "*"
+    }
+}
